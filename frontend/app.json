@@ -7,9 +7,14 @@
     "icon": "./assets/images/icon.png",
     "scheme": "crmrecorder",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-image.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1e40af"
+    },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.crmrecorder.app",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Record calls for CRM monitoring",
         "NSContactsUsageDescription": "Identify callers in recordings"
@@ -17,6 +22,7 @@
     },
     "android": {
       "package": "com.crmrecorder.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#1e40af"
@@ -25,13 +31,8 @@
         "RECORD_AUDIO",
         "READ_PHONE_STATE",
         "READ_CALL_LOG",
-        "READ_CONTACTS",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_EXTERNAL_STORAGE",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_MICROPHONE"
-      ],
-      "edgeToEdgeEnabled": true
+        "READ_CONTACTS"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -39,17 +40,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-image.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#1e40af"
-        }
-      ],
-      "expo-audio"
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
