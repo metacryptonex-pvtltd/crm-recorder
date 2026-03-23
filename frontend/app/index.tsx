@@ -10,24 +10,33 @@ import {
   Platform,
   StatusBar,
   RefreshControl,
-  TextInput,
-  Modal,
 } from 'react-native';
 import { AudioPlayer } from 'expo-audio';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { recordingService } from '../services/RecordingService';
+import { callMonitoringService } from '../services/CallMonitoringService';
 import { CallRecording } from '../types/recording';
+
+// Conditionally import CallDetectorManager only on native platforms
+let CallDetectorManager: any = null;
+if (Platform.OS === 'android' || Platform.OS === 'ios') {
+  try {
+    CallDetectorManager = require('react-native-call-detection').default;
+  } catch (e) {
+    console.log('Call detection not available');
+  }
+}
 
 export default function HomeScreen() {
   const [recordings, setRecordings] = useState<CallRecording[]>([]);
-  const [isRecording, setIsRecording] = useState(false);
+  const [isMonitoring, setIsMonitoring] = useState(false);
+  const [isRecordingNow, setIsRecordingNow] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [sound, setSound] = useState<AudioPlayer | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [hasPermissions, setHasPermissions] = useState(false);
-  const [showManualDialog, setShowManualDialog] = useState(false);
-  const [manualPhoneNumber, setManualPhoneNumber] = useState('');
+  const [callDetector, setCallDetector] = useState<any>(null);
+  const [currentCallNumber, setCurrentCallNumber] = useState<string>('');
 
   useEffect(() => {
     initializeApp();
@@ -36,16 +45,28 @@ export default function HomeScreen() {
       if (sound) {
         sound.remove();
       }
+      if (callDetector) {
+        callDetector.dispose();
+      }
     };
   }, []);
 
   const initializeApp = async () => {
-    await requestPermissions();
-    await recordingService.initialize();
-    await loadRecordings();
+    const permsGranted = await requestPermissions();
+    if (permsGranted) {
+      await callMonitoringService.initialize();
+      await loadRecordings();
+      
+      // Check if monitoring was previously enabled
+      const wasMonitoring = callMonitoringService.getIsMonitoring();
+      if (wasMonitoring) {
+        setIsMonitoring(true);
+        setupCallDetection();
+      }
+    }
   };
 
-  const requestPermissions = async () => {
+  const requestPermissions = async (): Promise<boolean> => {
     try {
       if (Platform.OS === 'android') {
         const permissions = [
@@ -62,30 +83,89 @@ export default function HomeScreen() {
 
         if (allGranted) {
           setHasPermissions(true);
-          Alert.alert(
-            'Permissions Granted',
-            'CRM-RECORDER is ready to record calls for business monitoring.',
-            [{ text: 'OK' }]
-          );
+          return true;
         } else {
           Alert.alert(
             'Permissions Required',
-            'This app requires audio recording and phone state permissions to function properly for CRM call monitoring.',
+            'CRM-RECORDER needs microphone, phone state, and call log permissions to automatically record calls.',
             [{ text: 'OK' }]
           );
+          return false;
         }
       } else {
-        // iOS - permissions requested when needed
         setHasPermissions(true);
+        return true;
       }
     } catch (err) {
       console.error('Permission error:', err);
+      return false;
+    }
+  };
+
+  const setupCallDetection = () => {
+    if (Platform.OS !== 'android') {
+      if (Platform.OS === 'web') {
+        // For web preview, show info message
+        Alert.alert(
+          'Preview Mode',
+          'Automatic call detection works on real Android devices. This is a web preview.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      Alert.alert('Not Supported', 'Automatic call detection is only available on Android');
+      return;
+    }
+
+    if (!CallDetectorManager) {
+      Alert.alert('Error', 'Call detection module not available');
+      return;
+    }
+
+    try {
+      const detector = new CallDetectorManager(
+        (event, phoneNumber) => {
+          console.log('Call event:', event, phoneNumber);
+          
+          if (event === 'Disconnected') {
+            // Call ended
+            console.log('Call ended');
+            setIsRecordingNow(false);
+            setCurrentCallNumber('');
+            callMonitoringService.onCallEnded();
+            loadRecordings(); // Refresh list
+          } else if (event === 'Incoming' || event === 'Offhook') {
+            // Call started (Offhook = answered)
+            if (event === 'Offhook' && !callMonitoringService.getIsRecording()) {
+              const number = phoneNumber || 'Unknown';
+              console.log('Call started:', number);
+              setIsRecordingNow(true);
+              setCurrentCallNumber(number);
+              
+              const callType = currentCallNumber ? 'incoming' : 'outgoing';
+              callMonitoringService.onCallStarted(number, callType);
+            }
+          }
+        },
+        false, // readPhoneNumber - we'll get it from call log if possible
+        () => {
+          console.log('Call detector initialized');
+        },
+        (error) => {
+          console.error('Call detector error:', error);
+        }
+      );
+
+      setCallDetector(detector);
+    } catch (error) {
+      console.error('Failed to setup call detection:', error);
+      Alert.alert('Error', 'Failed to setup automatic call detection');
     }
   };
 
   const loadRecordings = async () => {
     try {
-      const allRecordings = await recordingService.getAllRecordings();
+      const allRecordings = await callMonitoringService.getAllRecordings();
       setRecordings(allRecordings);
     } catch (error) {
       console.error('Failed to load recordings:', error);
@@ -98,63 +178,53 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, []);
 
-  const handleStartRecording = async () => {
+  const handleToggleMonitoring = async () => {
     if (!hasPermissions) {
       await requestPermissions();
       return;
     }
 
-    setShowManualDialog(true);
-  };
-
-  const startManualRecording = async () => {
-    if (!manualPhoneNumber.trim()) {
-      Alert.alert('Error', 'Please enter a phone number');
-      return;
-    }
-
-    const success = await recordingService.startRecording(manualPhoneNumber, 'outgoing');
-    if (success) {
-      setIsRecording(true);
-      setShowManualDialog(false);
-      setManualPhoneNumber('');
-      Alert.alert('Recording Started', 'Call recording is now active');
+    if (isMonitoring) {
+      // Stop monitoring
+      await callMonitoringService.stopMonitoring();
+      if (callDetector) {
+        callDetector.dispose();
+        setCallDetector(null);
+      }
+      setIsMonitoring(false);
+      setIsRecordingNow(false);
+      Alert.alert('Monitoring Stopped', 'Call recording is now disabled');
     } else {
-      Alert.alert('Error', 'Failed to start recording');
-    }
-  };
-
-  const handleStopRecording = async () => {
-    const recording = await recordingService.stopRecording();
-    if (recording) {
-      setIsRecording(false);
-      await loadRecordings();
-      Alert.alert('Recording Saved', `Call with ${recording.phoneNumber} has been recorded`);
+      // Start monitoring
+      await callMonitoringService.startMonitoring();
+      setupCallDetection();
+      setIsMonitoring(true);
+      Alert.alert(
+        'Monitoring Started',
+        'CRM-RECORDER will now automatically record all incoming and outgoing calls.\n\n💡 Tip: Use speakerphone for best recording quality.',
+        [{ text: 'Got it' }]
+      );
     }
   };
 
   const playRecording = async (recording: CallRecording) => {
     try {
-      // Stop current playback if any
       if (sound) {
         await sound.remove();
         setSound(null);
       }
 
-      // If clicking the same recording, just stop
       if (playingId === recording.id) {
         setPlayingId(null);
         return;
       }
 
-      // Load and play new recording
       const player = new AudioPlayer({ uri: recording.filePath });
       await player.play();
 
       setSound(player);
       setPlayingId(recording.id);
 
-      // When playback finishes (we'll use a timeout based on duration)
       setTimeout(() => {
         setPlayingId(null);
       }, recording.duration * 1000);
@@ -174,7 +244,7 @@ export default function HomeScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const success = await recordingService.deleteRecording(recording.id);
+            const success = await callMonitoringService.deleteRecording(recording.id);
             if (success) {
               await loadRecordings();
             }
@@ -243,28 +313,48 @@ export default function HomeScreen() {
           <MaterialIcons name="phone-in-talk" size={32} color="#fff" />
           <Text style={styles.headerTitle}>CRM-RECORDER</Text>
         </View>
-        <Text style={styles.headerSubtitle}>Call Monitoring System</Text>
+        <Text style={styles.headerSubtitle}>Automatic Call Monitoring</Text>
       </View>
 
-      {/* Recording Controls */}
+      {/* Monitoring Controls */}
       <View style={styles.controls}>
-        {!isRecording ? (
-          <TouchableOpacity
-            style={styles.recordButton}
-            onPress={handleStartRecording}
-          >
-            <MaterialIcons name="fiber-manual-record" size={32} color="#fff" />
-            <Text style={styles.recordButtonText}>Start Recording</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.recordButton, styles.stopButton]}
-            onPress={handleStopRecording}
-          >
-            <MaterialIcons name="stop" size={32} color="#fff" />
-            <Text style={styles.recordButtonText}>Stop Recording</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.statusContainer}>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDot, { backgroundColor: isMonitoring ? '#10b981' : '#ef4444' }]} />
+            <Text style={styles.statusText}>
+              {isMonitoring ? 'Monitoring Active' : 'Monitoring Inactive'}
+            </Text>
+          </View>
+          {isRecordingNow && (
+            <View style={styles.recordingIndicator}>
+              <MaterialIcons name="fiber-manual-record" size={16} color="#ef4444" />
+              <Text style={styles.recordingText}>Recording: {currentCallNumber}</Text>
+            </View>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            isMonitoring ? styles.stopButton : styles.startButton
+          ]}
+          onPress={handleToggleMonitoring}
+        >
+          <MaterialIcons
+            name={isMonitoring ? 'stop' : 'play-arrow'}
+            size={28}
+            color="#fff"
+          />
+          <Text style={styles.toggleButtonText}>
+            {isMonitoring ? 'Stop Auto-Recording' : 'Start Auto-Recording'}
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.helpText}>
+          {isMonitoring 
+            ? '✅ All calls will be recorded automatically' 
+            : 'Tap Start to enable automatic call recording'}
+        </Text>
       </View>
 
       {/* Recordings List */}
@@ -278,7 +368,7 @@ export default function HomeScreen() {
             <MaterialIcons name="phone-disabled" size={64} color="#9ca3af" />
             <Text style={styles.emptyText}>No recordings yet</Text>
             <Text style={styles.emptySubtext}>
-              Start recording calls to monitor CRM activities
+              Enable auto-recording to start monitoring calls
             </Text>
           </View>
         ) : (
@@ -293,51 +383,6 @@ export default function HomeScreen() {
           />
         )}
       </View>
-
-      {/* Manual Recording Dialog */}
-      <Modal
-        visible={showManualDialog}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowManualDialog(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Start Manual Recording</Text>
-            <Text style={styles.modalSubtitle}>
-              Enter the phone number for this call
-            </Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Phone Number"
-              keyboardType="phone-pad"
-              value={manualPhoneNumber}
-              onChangeText={setManualPhoneNumber}
-              autoFocus
-            />
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowManualDialog(false);
-                  setManualPhoneNumber('');
-                }}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.startButton]}
-                onPress={startManualRecording}
-              >
-                <Text style={styles.modalButtonText}>Start</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -373,8 +418,41 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
-  recordButton: {
-    backgroundColor: '#ef4444',
+  statusContainer: {
+    marginBottom: 16,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  statusText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  recordingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#fef2f2',
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  recordingText: {
+    fontSize: 14,
+    color: '#dc2626',
+    fontWeight: '500',
+  },
+  toggleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -382,13 +460,22 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
   },
-  stopButton: {
-    backgroundColor: '#dc2626',
+  startButton: {
+    backgroundColor: '#10b981',
   },
-  recordButtonText: {
+  stopButton: {
+    backgroundColor: '#ef4444',
+  },
+  toggleButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  helpText: {
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 12,
   },
   listContainer: {
     flex: 1,
@@ -478,59 +565,5 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     marginTop: 8,
     textAlign: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 20,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#e5e7eb',
-  },
-  startButton: {
-    backgroundColor: '#ef4444',
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
   },
 });

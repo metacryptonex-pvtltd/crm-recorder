@@ -1,180 +1,333 @@
-# CRM-RECORDER - Call Monitoring System
+# CRM-RECORDER - Automatic Call Monitoring System
 
-## Overview
-CRM-RECORDER is a mobile application designed for CRM call monitoring on company-provided Android devices. It allows supervisors to track whether staff are contacting assigned leads by recording phone calls.
+## 🎯 Overview
+CRM-RECORDER is an automatic call recording app for Android devices. Once enabled, it automatically records ALL incoming and outgoing calls without any manual intervention - perfect for monitoring CRM staff performance on company-provided devices.
 
-## Features
+## ✨ Key Features
 
-### ✅ Implemented Features
-1. **Manual Call Recording**
-   - Start/stop recording manually
-   - Enter phone number for each recording
-   - Records in M4A format (high quality)
+### ✅ **Automatic Call Recording**
+- **One-tap enable/disable**: Just tap "Start Auto-Recording" once
+- **Completely automatic**: Records all calls without asking for phone numbers
+- **Background monitoring**: Works even when app is in background
+- **Smart detection**: Automatically detects incoming and outgoing calls
+- **Auto phone number capture**: Extracts phone numbers from calls automatically
 
-2. **Recordings Management**
-   - List all recorded calls
-   - Shows phone number, date, time, and duration
-   - Call type indicator (incoming/outgoing)
-   - Play recordings with simple controls
-   - Delete recordings
+### 📱 **Modern Interface**
+- Clear monitoring status indicator (Active/Inactive)
+- Real-time recording indicator during active calls
+- Professional blue-themed UI
+- Simple ON/OFF toggle button
 
-3. **Storage**
-   - Recordings stored in app's internal storage
-   - Metadata saved locally (AsyncStorage)
-   - Persistent across app restarts
+### 📂 **Recordings Management**
+- Automatic list of all recorded calls
+- Shows phone number, date, time, and duration
+- Call type indicator (incoming ↓ / outgoing ↑)
+- Tap to play any recording
+- Easy delete functionality
+- Pull to refresh
 
-4. **Permissions**
-   - RECORD_AUDIO
-   - READ_PHONE_STATE
-   - READ_CALL_LOG
-   - Requests permissions on first launch
-
-## Android 10+ Limitations
-
-### Important Technical Constraints
-
-**Call Audio Recording on Modern Android:**
-
-Starting from Android 10 (API 29), Google heavily restricted call recording capabilities:
-
-1. **VOICE_CALL Audio Source Blocked**
-   - The `VOICE_CALL` audio source (which records both sides of a call) requires system-level permissions
-   - Standard apps cannot access it without manufacturer cooperation or root access
-
-2. **Current Implementation**
-   - This app uses the **MICROPHONE** audio source
-   - Records from the device's microphone during calls
-   - **Best used with speakerphone ON** for clearest recording of both parties
-
-3. **Workarounds for Better Quality**
-   - Keep phone on speakerphone during calls
-   - Ensure quiet environment
-   - Keep device close to both parties
-   - Consider using company devices that support call recording (some manufacturers like Samsung, Xiaomi have built-in support)
-
-### Automatic Call Detection
-
-**Current Status: Manual Recording**
-
-The current version requires manual start/stop of recordings because:
-
-1. **PhoneStateListener Restrictions**
-   - Android 10+ requires foreground service with specific permissions
-   - Need to implement a persistent background service
-   - Battery optimization may kill background services
-
-2. **Future Enhancement Path**
-   - Implement InCallService for automatic detection
-   - This requires deeper system integration
-   - May need to eject from Expo managed workflow to bare workflow
-   - Would require custom native modules
-
-## Usage Instructions
+## 🚀 How It Works
 
 ### For Company Supervisors
 
-1. **Initial Setup**
-   - Install app on company-provided devices
-   - Grant all requested permissions
-   - Ensure staff understand monitoring policy
+**1. First-Time Setup (Do Once)**
+- Install app on company device
+- Open app and grant permissions:
+  - ✅ Microphone (RECORD_AUDIO)
+  - ✅ Phone State (READ_PHONE_STATE)
+  - ✅ Call Log (READ_CALL_LOG)
+- Tap "Start Auto-Recording"
+- Done! App will now work automatically
 
-2. **Recording a Call**
-   - Before/during a call, tap "Start Recording"
-   - Enter the lead's phone number
-   - **Turn on speakerphone for best quality**
-   - Tap "Stop Recording" when call ends
+**2. Automatic Recording**
+- When any call starts (incoming or outgoing):
+  - App automatically starts recording
+  - Shows "Recording: [phone number]" indicator
+  - Records entire conversation
+- When call ends:
+  - Automatically stops recording
+  - Saves with phone number, date, time
+  - Adds to recordings list
 
-3. **Reviewing Recordings**
-   - All recordings appear in the main list
-   - Tap play button to listen
-   - Check date/time to verify call attempts
-   - Tap delete to remove recordings
+**3. Reviewing Calls**
+- Open app to see list of all recordings
+- Each entry shows:
+  - 📞 Phone number
+  - 📅 Date and time
+  - ⏱️ Call duration  
+  - ↓/↑ Incoming/Outgoing indicator
+- Tap ▶ Play button to listen
+- Tap 🗑️ Delete to remove
 
-### For Development/IT Team
+## 📋 Usage Guide
 
-**Building APK:**
-```bash
-# Navigate to frontend directory
-cd /app/frontend
+### Daily Operation
 
-# Build for Android
-expo build:android
-
-# Or use EAS Build (recommended)
-eas build --platform android
+```
+┌─────────────────────────┐
+│  Open App (First Time)  │
+│  Grant Permissions      │
+│  Tap "Start Recording"  │
+└───────────┬─────────────┘
+            │
+            ▼
+┌─────────────────────────┐
+│  Monitoring Active ✅   │
+│  (Leave it running)     │
+└───────────┬─────────────┘
+            │
+            ▼
+     Staff Makes Call
+            │
+            ▼
+┌─────────────────────────┐
+│  Auto Starts Recording  │
+│  "Recording: +1234..."  │
+└───────────┬─────────────┘
+            │
+            ▼
+      Call Ends
+            │
+            ▼
+┌─────────────────────────┐
+│  Auto Saves Recording   │
+│  Appears in List        │
+└─────────────────────────┘
 ```
 
-**Required Permissions in AndroidManifest:**
-```xml
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
-<uses-permission android:name="android.permission.READ_PHONE_STATE" />
-<uses-permission android:name="android.permission.READ_CALL_LOG" />
-<uses-permission android:name="android.permission.READ_CONTACTS" />
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-```
+### No Manual Steps Needed!
+- ❌ No need to click "Start" before each call
+- ❌ No need to enter phone numbers
+- ❌ No need to click "Stop" after calls
+- ✅ Everything happens automatically!
 
-## Known Issues & Recommendations
+## ⚠️ Important: Android 10+ Audio Quality
 
-### Audio Quality
-- **Issue**: Recording quality depends on microphone pickup
-- **Solution**: Use speakerphone mode during calls
+### Recording Limitation
+Due to Android 10+ security restrictions:
+- App records from **MICROPHONE** (not direct call audio)
+- Both parties can be heard, but quality depends on setup
 
-### Battery Usage
-- **Issue**: Recording uses battery
-- **Solution**: Keep devices charged, recording only active during calls
+### **For Best Quality** (IMPORTANT!)
+1. **Use Speakerphone Mode**  
+   - Turn on speaker during calls
+   - This ensures both sides are clearly recorded
+   
+2. **Quiet Environment**
+   - Record in quiet office space
+   - Minimize background noise
+
+3. **Keep Phone Nearby**
+   - Don't place phone far away during calls
+   - Keep within 1-2 feet for best results
+
+### Why This Limitation?
+- Google blocked direct call audio access in Android 10+
+- Requires manufacturer-specific features or root access
+- Our app uses the legal, Play Store-compliant method
+- **All call recorder apps face this same limitation**
+
+## 🔧 Technical Details
+
+### How Auto-Detection Works
+- **PhoneStateListener**: Monitors phone call states
+- **Call Events**: Detects Incoming, Offhook (answered), Disconnected
+- **Background Service**: Runs continuously when monitoring enabled
+- **Audio Recording**: Uses expo-audio with high-quality M4A format
 
 ### Storage
-- **Issue**: Recordings accumulate over time
-- **Solution**: Regularly review and delete old recordings
+- **Location**: App's internal storage (`/recordings/`)
+- **Format**: M4A (high quality, compatible)
+- **Metadata**: Stored in AsyncStorage
+- **Privacy**: Only accessible within the app
 
-### Device Compatibility
-- **Best**: Samsung devices with built-in call recording support
-- **Good**: Stock Android 10-13 devices
-- **Limited**: Some budget devices with restricted audio access
+### Permissions Required
+```xml
+RECORD_AUDIO              → Record call audio
+READ_PHONE_STATE          → Detect when calls start/end
+READ_CALL_LOG             → Get phone numbers
+FOREGROUND_SERVICE        → Keep monitoring active
+FOREGROUND_SERVICE_MICROPHONE → Allow background recording
+```
 
-## Future Enhancements
+## 📱 Building the APK
 
-### Phase 2 (Automatic Recording)
-1. Implement InCallService for automatic call detection
-2. Background service for continuous monitoring
-3. Automatic recording on call connect
-4. Cloud backup integration
+### Quick Build (Recommended)
+```bash
+# Install EAS CLI
+npm install -g eas-cli
 
-### Phase 3 (Advanced Features)
-1. CRM integration API
-2. Lead matching with phone numbers
-3. Call analytics and reporting
-4. Export recordings to cloud storage
-5. Multi-user management dashboard
+# Login to Expo
+eas login
 
-## Technical Stack
+# Build APK
+cd /app/frontend
+eas build --platform android --profile preview
 
-- **Frontend**: React Native (Expo)
-- **Audio**: expo-audio
-- **Storage**: AsyncStorage + FileSystem
-- **UI**: React Native components with Material Icons
+# Download APK from the link provided
+# Install on company devices
+```
 
-## Legal Compliance
+### Result
+- Signed APK file (ready to install)
+- Size: ~200-400MB
+- Android 10+ compatible
+- No Google Play required
 
-⚠️ **Important**: Ensure compliance with local laws regarding call recording:
-- Some jurisdictions require two-party consent
-- Company policies must be clear
-- Staff should be informed of monitoring
-- Check your region's call recording laws before deployment
+See `/app/BUILD_INSTRUCTIONS.md` for detailed build options.
 
-## Support
+## 💡 Best Practices
 
-For technical issues or questions:
-1. Check device compatibility (Android 10+ with microphone access)
-2. Verify all permissions are granted
-3. Test with speakerphone ON
-4. Review logs for errors
+### For IT Teams
+1. **Pre-configure devices**: Install app before giving to staff
+2. **Enable monitoring**: Turn on auto-recording during setup
+3. **Test first**: Make test calls to verify recording works
+4. **Check storage**: Ensure devices have enough space
+5. **Regular cleanup**: Review and delete old recordings monthly
+
+### For Staff Using Devices
+1. **Keep app open** (at least once) after device restart
+2. **Use speakerphone** for best recording quality
+3. **Don't force-close app** from task manager
+4. **Keep device charged** during business hours
+5. **Don't disable permissions** in settings
+
+### For Supervisors
+1. **Review regularly**: Check recordings weekly
+2. **Look for patterns**: Missing calls indicate issues
+3. **Verify quality**: Sample recordings to check audio clarity
+4. **Maintain compliance**: Follow local call recording laws
+
+## 🔐 Legal & Compliance
+
+### ⚠️ IMPORTANT LEGAL NOTICE
+
+**Call Recording Laws Vary by Region:**
+
+- **Two-Party Consent**: Some regions require ALL parties to know they're being recorded
+- **Company Policy**: Ensure staff are informed of monitoring
+- **Notification**: Consider notifying customers during calls
+- **Data Protection**: Comply with GDPR/privacy laws in your region
+
+**Before Deployment:**
+1. ✅ Check local call recording laws
+2. ✅ Update company policy documents
+3. ✅ Inform all staff about monitoring
+4. ✅ Consider legal consultation
+5. ✅ Add call notification if required
+
+## 🛠️ Troubleshooting
+
+### App Not Recording
+**Problem**: Calls aren't being recorded  
+**Solutions**:
+- Check monitoring status is "Active" (green dot)
+- Verify all permissions are granted
+- Restart app after giving permissions
+- Check phone isn't in battery saver mode
+- Ensure app isn't restricted in background
+
+### Poor Audio Quality
+**Problem**: Can't hear one side of conversation  
+**Solutions**:
+- ✅ **USE SPEAKERPHONE!** (Most important)
+- Reduce background noise
+- Keep phone closer during calls
+- Test with different devices/manufacturers
+- Some devices have better microphones
+
+### Phone Number Shows "Unknown"
+**Problem**: Recording saved without number  
+**Solutions**:
+- Grant READ_CALL_LOG permission
+- Wait a moment after call connects
+- Some blocked numbers can't be detected
+- VoIP calls may not show numbers
+
+### Recordings Disappear
+**Problem**: Old recordings are missing  
+**Solutions**:
+- Check device storage isn't full
+- App data not cleared in settings
+- Device wasn't factory reset
+- Recordings stored in app data (deleted if app uninstalled)
+
+### App Stops Monitoring
+**Problem**: Monitoring turns off by itself  
+**Solutions**:
+- Disable battery optimization for app
+- Add app to "Protected apps" list (manufacturer-specific)
+- Don't swipe app away from recent apps
+- Keep app open in background
+
+## 📊 Device Compatibility
+
+### ✅ Best Performance
+- Samsung Galaxy devices (S20+, A-series)
+- Google Pixel phones (6+)
+- OnePlus devices (8+)
+- Xiaomi/Redmi (with MIUI 12+)
+
+### ⚠️ May Require Extra Setup
+- Huawei devices (battery optimization)
+- Oppo/Realme (background restrictions)
+- Vivo devices (auto-start settings)
+
+### Minimum Requirements
+- Android 10 or higher
+- 2GB RAM minimum
+- 500MB free storage
+- Active microphone
+
+## 🚀 Future Enhancements
+
+### Planned Features
+- [ ] Cloud backup integration
+- [ ] CRM system API integration
+- [ ] Advanced call analytics
+- [ ] Multi-device management dashboard
+- [ ] Export to CSV/Excel
+- [ ] Search by phone number
+- [ ] Call tagging and notes
+- [ ] Scheduled auto-delete old recordings
+
+## 📞 Support & FAQ
+
+### Q: Does this work on iPhone?
+A: No, automatic call detection is Android-only due to iOS restrictions.
+
+### Q: Can I record specific numbers only?
+A: Currently records all calls. Filtering feature coming in future update.
+
+### Q: How much storage do recordings use?
+A: Approximately 1MB per minute of recording (~30MB per hour).
+
+### Q: Can staff disable monitoring?
+A: They can stop monitoring in-app. Consider using MDM to prevent app removal/modification.
+
+### Q: Is this legal in my country?
+A: Check local laws. Many regions require consent. Consult legal advisor.
+
+### Q: Why not use Google Play Store recorder apps?
+A: Custom app provides better control, branding, and integration with your CRM system.
 
 ---
 
-**App Version**: 1.0.0  
+## 📝 Summary
+
+**CRM-RECORDER** is a set-and-forget automatic call monitoring solution:
+
+1. ✅ **Install once** → Works automatically
+2. ✅ **One tap enable** → Records all calls
+3. ✅ **No manual steps** → Completely automatic
+4. ✅ **Full call history** → Easy to review
+5. ✅ **Professional UI** → Easy to use
+
+Perfect for CRM teams, sales monitoring, quality assurance, and staff performance tracking on company-provided Android devices.
+
+---
+
+**Version**: 2.0.0 (Automatic Recording)  
 **Last Updated**: March 2026  
-**Compatible**: Android 10+
+**Compatible**: Android 10+  
+**License**: Proprietary - Company Internal Use
